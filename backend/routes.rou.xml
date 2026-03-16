@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-03-15 23:05:26.466645 by Eclipse SUMO randomTrips.py v1_26_0+0000-fa7df22d7f1
+<!-- generated on 2026-03-16 01:04:14.067010 by Eclipse SUMO randomTrips.py v1_26_0+0000-fa7df22d7f1
 <configuration>
     <net-file value="C:\Users\HP\Downloads\sumo_casa_v2\projet_sumo\sumo\casablanca.net.xml"/>
     <output-trip-file value="C:\Users\HP\Downloads\sumo_casa_v2\projet_sumo\sumo\trips.trips.xml"/>
@@ -10,7 +10,7 @@
 </configuration>
 -->
 
-<!-- generated on 2026-03-15T23:05:26.257081+00:00 by Eclipse SUMO duarouter 1.26.0
+<!-- generated on 2026-03-16T01:04:13.944631+00:00 by Eclipse SUMO duarouter 1.26.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>

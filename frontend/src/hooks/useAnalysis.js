@@ -44,8 +44,7 @@ export function useAnalysisPipeline(runId) {
   // 2. Fetch Specific Algo Result (Post-Simulation)
   const fetchAlgo = useCallback(async (algo) => {
     if (!runId) return
-    // Map backend key → internal allResults key (matches ALGO_CONFIG ids)
-    const internalKey = algo === "st_dbscan" ? "stdbscan" : algo
+    const internalKey = algo === "st_dbscan" ? "stdbscan" : algo;
     try {
       const { data } = algo === "traclus"
         ? await api.getTraclusResult(runId)
@@ -58,8 +57,8 @@ export function useAnalysisPipeline(runId) {
     if (!statusDoc?.analysis_steps) return
     for (const algo of STEP_ORDER) {
       if (algo === "compute_features") continue
-      // algo is the backend key (e.g. "st_dbscan") — use it directly
-      if (statusDoc.analysis_steps[algo]?.status === "done") {
+      const backendKey = algo === "st_dbscan" ? "st_dbscan" : algo;
+      if (statusDoc.analysis_steps[backendKey]?.status === "done") {
         await fetchAlgo(algo)
       }
     }

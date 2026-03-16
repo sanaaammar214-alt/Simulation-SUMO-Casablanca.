@@ -13,7 +13,16 @@ export default function AlgoSidebar({ activeAlgoId, onSelect }) {
             key={id}
             className={`algo-item-btn ${isActive ? "active" : ""}`}
             onClick={() => onSelect(id)}
-            style={{ "--algo-color": cfg.color }}
+            style={{
+              "--algo-color": cfg.color,
+              ...(isActive
+                ? {
+                    background: `${cfg.color}18`,
+                    borderColor: `${cfg.color}40`,
+                    boxShadow: `0 0 10px ${cfg.color}22`,
+                  }
+                : { background: "transparent", borderColor: "transparent" }),
+            }}
             title={`${cfg.label} — ${cfg.ref}`}
           >
             <span className="icon">{cfg.icon}</span>

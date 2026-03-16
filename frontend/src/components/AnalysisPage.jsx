@@ -1,255 +1,301 @@
-import { useState, useEffect } from "react"
-import { ALGO_CONFIG }       from "./Constants"
+import { useState } from "react"
 import StatsPanel            from "./panels/StatsPanel"
 import AnalysisPipelinePanel from "./panels/AnalysisPipelinePanel"
 import GraphePanel           from "./panels/GraphePanel"
 import ComparisonPanel       from "./panels/ComparisonPanel"
+import { ALGO_CONFIG }       from "./Constants"
 
-// ────────────────────────────────────────────────────────────
-//  MINI CHART COMPONENTS (Inlined for simplicity in this view)
-// ────────────────────────────────────────────────────────────
-
-function Sparkline({ data = [], color = "#00e5ff", height = 60 }) {
-  if (!data || data.length < 2) return <div style={{ height, background: "rgba(0,0,0,0.1)" }} />;
-  const w = 100, h = height;
-  const min = Math.min(...data), max = Math.max(...data);
-  const scaleY = (v) => h - ((v - min) / (max - min || 1)) * (h - 8) - 4;
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${scaleY(v)}`).join(" ");
-  const area = `M0,${h} L${data.map((v, i) => `${(i / (data.length - 1)) * w},${scaleY(v)}`).join(" L")} L${w},${h} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height, display: "block" }}>
-      <defs>
-        <linearGradient id={`sg-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#sg-${color.replace("#","")})`} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
-      <circle
-        cx={w}
-        cy={scaleY(data[data.length - 1])}
-        r="2.5" fill={color}
-      />
-    </svg>
-  );
-}
-
-function BarChart({ data = [], labels = [], color = "#00e5ff", height = 90 }) {
-  if (!data || data.length === 0) return <div style={{ height }} />;
-  const max = Math.max(...data);
-  return (
-    <svg viewBox={`0 0 100 ${height}`} style={{ width: "100%", height, display: "block" }}>
-      {data.map((v, i) => {
-        const bh = (v / max) * (height - 16);
-        const bw = 100 / data.length - 2;
-        const x = i * (100 / data.length) + 1;
-        return (
-          <g key={i}>
-            <rect
-              x={x} y={height - bh - 14}
-              width={bw} height={bh}
-              fill={color} opacity="0.4" rx="1"
-            />
-            <rect
-              x={x} y={height - bh - 14}
-              width={bw} height={2}
-              fill={color} opacity="0.9" rx="1"
-            />
-            {labels && i % 2 === 0 && (
-              <text x={x + bw / 2} y={height - 2} textAnchor="middle"
-                fill="rgba(255,255,255,0.3)" fontSize="5">{labels[i]}</text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function DonutRing({ value, max = 100, color = "#00e5ff", size = 80 }) {
-  const r = 34, cx = size / 2, cy = size / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (value / max) * circ;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(26,37,53,0.8)" strokeWidth="6" />
-      <circle
-        cx={cx} cy={cy} r={r} fill="none"
-        stroke={color} strokeWidth="6"
-        strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cy})`}
-        style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-      />
-    </svg>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
-//  ANALYSIS PAGE COMPONENT
-// ────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "analyse",  label: "ANALYSE",  icon: "◎" },
+  { id: "pipeline", label: "PIPELINE", icon: "⟶" },
+  { id: "graphe",   label: "GRAPHE",   icon: "∿" },
+  { id: "bilan",    label: "BILAN",    icon: "⊞" },
+]
 
 export default function AnalysisPage({
-  stats = {}, activeAlgo = {}, allResults = {}, liveClustering = null,
-  vehicles = [], selectedCluster = null, onSelectCluster,
-  pipelineStatus = { analysis_status: "pending" }, step = 0, currentRunId = "—", onBack
+  stats, activeAlgo, allResults, liveClustering,
+  vehicles, selectedCluster, onSelectCluster,
+  pipelineStatus, step, currentRunId, onBack
 }) {
-  const [activeAlgoId, setActiveAlgoId] = useState(activeAlgo?.id || "kmeans");
+  const [activeTab,    setActiveTab]    = useState("analyse")
+  const [activeAlgoId, setActiveAlgoId] = useState(activeAlgo?.id || "kmeans")
 
-  const currentAlgo = ALGO_CONFIG[activeAlgoId] || activeAlgo || ALGO_CONFIG["kmeans"];
+  const currentAlgo  = ALGO_CONFIG[activeAlgoId] || activeAlgo
+  const pipelineSteps = pipelineStatus?.analysis_steps || {}
+  const globalStatus  = pipelineStatus?.analysis_status || "pending"
 
-  // Fake data for charts
-  const history = {
-    traffic: [12, 18, 24, 31, 28, 35, 42, 38, 45, 52, 48, 55, 61, 58, 49],
-    density: [8, 14, 19, 27, 23, 32, 38, 34, 41, 47, 43, 50, 55, 52, 44],
-    throughput: [22, 31, 38, 44, 52, 49, 57, 63, 71, 68, 74, 81, 78, 85, 79]
-  };
-
-  const hourLabels = ["00","02","04","06","08","10","12","14","16","18","20","22"];
-  const hourlyBars = [15, 22, 35, 48, 61, 72, 85, 91, 78, 65, 58, 71, 88, 92, 84, 76, 69, 79, 84, 71, 55, 42, 31, 22];
+  const statusColor = globalStatus === "done"    ? "#00ff9d"
+                    : globalStatus === "running" ? (currentAlgo?.color || "#00e5ff")
+                    :                              "#ffb300"
 
   return (
-    <div className="analysis-page-v2 page-enter">
-      {/* ── HEADER ── */}
-      <div className="analysis-header-v2">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div className="analysis-title-row">
-              <div className="analysis-title">
-                Tableau de <span style={{ color: currentAlgo.color }}>Bord</span> Analytique
+    <div style={s.page}>
+
+      {/* ══ HEADER ══════════════════════════════════════════ */}
+      <div style={s.header}>
+        <div style={s.hLeft}>
+          <div style={s.titleRow}>
+            <span style={{ ...s.titleIcon, color: currentAlgo?.color || "#00e5ff" }}>
+              {currentAlgo?.icon}
+            </span>
+            <div>
+              <div style={s.title}>
+                Tableau de{" "}
+                <span style={{ color: currentAlgo?.color || "#00e5ff" }}>Bord</span>{" "}
+                Analytique
               </div>
-              <div className="analysis-subtitle">CASABLANCA TRAFFIC INTELLIGENCE SYSTEM</div>
-            </div>
-            <div className="analysis-meta">
-              <div className="meta-chip">ALGORITHME <span style={{ color: currentAlgo.color }}>{currentAlgo.label} · {currentAlgo.ref}</span></div>
-              <div className="meta-chip">SESSION <span>#{String(currentRunId || 0).slice(-4)}</span></div>
-              <div className="meta-chip">RÉSEAU <span>Casablanca OSM</span></div>
-              <div className="meta-chip">STATUS <span style={{ color: pipelineStatus.analysis_status === 'done' ? 'var(--green)' : 'var(--amber)' }}>{pipelineStatus.analysis_status.toUpperCase()}</span></div>
-            </div>
-          </div>
-          <button className="top-btn" onClick={onBack} style={{ color: currentAlgo.color, borderColor: currentAlgo.color + "44" }}>
-            ← SIMULATION
-          </button>
-        </div>
-      </div>
-
-      {/* ── NAV (Simplified) ── */}
-      <div className="analysis-nav-v2">
-        <div style={{ display: "flex", gap: 4, marginRight: 20 }}>
-          {Object.values(ALGO_CONFIG).map(cfg => (
-            <div
-              key={cfg.id}
-              onClick={() => setActiveAlgoId(cfg.id)}
-              style={{
-                padding: "8px 12px", borderRadius: 4, cursor: "pointer",
-                border: "1px solid",
-                borderColor: activeAlgoId === cfg.id ? cfg.color : "transparent",
-                background: activeAlgoId === cfg.id ? cfg.color + "11" : "transparent",
-                color: activeAlgoId === cfg.id ? cfg.color : "var(--text-muted)",
-                fontSize: 10, transition: "all 0.2s"
-              }}
-            >
-              {cfg.abbr}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── BODY ── */}
-      <div className="analysis-body-v2">
-        {/* KPI Row */}
-        <div className="metrics-row">
-          {[
-            { label: "Véhicules Actifs", val: vehicles.length, sub: "en circulation", delta: "+12%", deltaType: "up", color: "#00e5ff" },
-            { label: "Congestion Moy.", val: stats.avg_congestion?.toFixed(2) || "0.00", sub: "indice global", delta: "-8%", deltaType: "down", color: "#ff3d57" },
-            { label: "Vitesse Moyenne", val: (stats.avg_speed || 0).toFixed(1) + "km/h", sub: "réseau entier", delta: "+5%", deltaType: "up", color: "#00ff9d" },
-            { label: "PAS SIM", val: step, sub: "progression", delta: "LIVE", deltaType: "neutral", color: currentAlgo.color },
-          ].map((m) => (
-            <div key={m.label} className="metric-card" style={{ "--accent-color": m.color }}>
-              <div className="metric-label">{m.label}</div>
-              <div className="metric-val" style={{ color: m.color }}>{m.val}</div>
-              <div className="metric-sub">
-                {m.sub}
-                <span className={`metric-delta ${m.deltaType === "up" ? "delta-up" : m.deltaType === "down" ? "delta-down" : "delta-neutral"}`}>
-                  {m.delta}
-                </span>
+              <div style={s.titleSub}>
+                SUMOCasa v2 &middot; Casablanca OSM &middot; {currentAlgo?.ref || "—"}
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Traffic Volume Chart */}
-        <div>
-          <div className="section-header">
-            <div className="section-title">Flux de Trafic</div>
-            <div className="section-line" />
-            <div className="section-badge">24H</div>
-          </div>
-          <div className="grid-3-1">
-            <div className="chart-card">
-              <div className="chart-card-header">
-                <div className="chart-card-title">Volume Horaire — Réseau Casablanca</div>
-                <div className="chart-card-action">Exporter CSV →</div>
-              </div>
-              <BarChart data={hourlyBars} labels={hourLabels} color={currentAlgo.color} height={110} />
-            </div>
-            <div className="chart-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-               <div className="chart-card-title" style={{ marginBottom: 15 }}>Score Efficience</div>
-               <DonutRing value={75} color={currentAlgo.color} size={100} />
-               <div className="score-num" style={{ color: currentAlgo.color, marginTop: -65, marginBottom: 40 }}>75%</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tendances */}
-        <div>
-          <div className="section-header">
-            <div className="section-title">Tendances en Temps Réel</div>
-            <div className="section-line" />
-            <div className="section-badge">LIVE</div>
-          </div>
-          <div className="grid-3">
+          <div style={s.metaRow}>
             {[
-              { title: "Densité Véhiculaire", data: history.density, color: "#00e5ff", val: vehicles.length + " veh" },
-              { title: "Throughput Réseau", data: history.throughput, color: "#00ff9d", val: "3,240 veh/h" },
-              { title: "Index Congestion", data: history.traffic, color: "#ffb300", val: (stats.avg_congestion || 0).toFixed(2) + " avg" },
-            ].map((s) => (
-              <div key={s.title} className="chart-card">
-                <div className="chart-card-header">
-                  <div className="chart-card-title">{s.title}</div>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 800, color: s.color }}>{s.val}</div>
-                </div>
-                <Sparkline data={s.data} color={s.color} height={56} />
+              ["ALGORITHME", currentAlgo?.label || "—", null],
+              ["VÉHICULES",  vehicles?.length ?? 0,     null],
+              ["PAS SIM",    step ?? 0,                 null],
+              ["RUN ID",     currentRunId ? `#${String(currentRunId).slice(-6)}` : "—", null],
+              ["PIPELINE",   globalStatus.toUpperCase(), statusColor],
+            ].map(([k, v, col]) => (
+              <div key={k} style={s.chip}>
+                <span style={s.chipKey}>{k}</span>
+                <span style={{ ...s.chipVal, color: col || "#e8f4fd" }}>{v}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Stats et Pipelines (Toutes les vues fusionnées en une seule page verticale) */}
-        <StatsPanel 
-            stats={stats} activeAlgo={currentAlgo} 
-            allResults={allResults} liveClustering={liveClustering} 
-            vehicles={vehicles} selectedCluster={selectedCluster} 
-            onSelectCluster={onSelectCluster} 
-        />
-        
-        <div className="section-header" style={{ marginTop: 20 }}>
-            <div className="section-title">État de la Pipeline</div>
-            <div className="section-line" />
+        <button
+          style={s.backBtn}
+          onMouseEnter={e => { e.currentTarget.style.background = `${currentAlgo?.color || "#00e5ff"}14`; e.currentTarget.style.borderColor = currentAlgo?.color || "#00e5ff" }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#1e3048" }}
+          onClick={onBack}
+        >
+          ← SIMULATION
+        </button>
+      </div>
+
+      {/* ══ NAVBAR : algo pills + tabs + pipeline dots ══════ */}
+      <div style={s.navBar}>
+
+        {/* Algo selector */}
+        <div style={s.algoPills}>
+          {Object.values(ALGO_CONFIG).map(cfg => {
+            const isActive = activeAlgoId === cfg.id
+            return (
+              <button
+                key={cfg.id}
+                title={`${cfg.label} — ${cfg.ref}`}
+                style={{
+                  ...s.algoPill,
+                  borderColor: isActive ? cfg.color : "transparent",
+                  color:        isActive ? cfg.color : "rgba(61,90,115,0.8)",
+                  background:   isActive ? `${cfg.color}12` : "transparent",
+                  boxShadow:    isActive ? `0 0 10px ${cfg.color}22` : "none",
+                }}
+                onClick={() => setActiveAlgoId(cfg.id)}
+              >
+                <span style={{ fontSize: 14 }}>{cfg.icon}</span>
+                <span>{cfg.abbr}</span>
+              </button>
+            )
+          })}
         </div>
-        <AnalysisPipelinePanel pipelineStatus={pipelineStatus} activeAlgo={currentAlgo} />
-        
-        <div className="section-header" style={{ marginTop: 20 }}>
-            <div className="section-title">Graphe & Comparaison</div>
-            <div className="section-line" />
+
+        <div style={s.navSep} />
+
+        {/* Tabs */}
+        <div style={s.tabs}>
+          {TABS.map(t => {
+            const isActive = activeTab === t.id
+            return (
+              <button
+                key={t.id}
+                style={{
+                  ...s.tab,
+                  color:        isActive ? currentAlgo?.color : "rgba(61,90,115,0.9)",
+                  borderBottom: isActive ? `2px solid ${currentAlgo?.color}` : "2px solid transparent",
+                  background:   isActive ? `${currentAlgo?.color}08` : "transparent",
+                }}
+                onClick={() => setActiveTab(t.id)}
+              >
+                <span style={{ marginRight: 7, opacity: 0.6, fontSize: 11 }}>{t.icon}</span>
+                {t.label}
+              </button>
+            )
+          })}
         </div>
-        <div className="grid-2">
-            <GraphePanel activeAlgo={currentAlgo} allResults={allResults} />
-            <ComparisonPanel allResults={allResults} pipelineStatus={pipelineStatus} liveClustering={liveClustering} />
+
+        {/* Pipeline mini-dots */}
+        <div style={s.pipeRow}>
+          {[
+            ["kmeans",  "KM"],
+            ["dbscan",  "DB"],
+            ["hdbscan", "HDB"],
+            ["spectral","SP"],
+            ["st_dbscan","STD"],
+            ["traclus", "TR"],
+          ].map(([key, lbl]) => {
+            const st = pipelineSteps[key]?.status || "pending"
+            const dotColor = st === "done"    ? "#00ff9d"
+                           : st === "running" ? "#ffb300"
+                           : st === "failed"  ? "#ff3d57"
+                           : "#1a2535"
+            return (
+              <div key={key} style={s.pipeDotWrap} title={`${key}: ${st}`}>
+                <div style={{
+                  ...s.pipeDot,
+                  background: dotColor,
+                  boxShadow:  st === "running" ? `0 0 6px #ffb300` : "none",
+                }} />
+                <span style={{
+                  fontSize: 9, letterSpacing: "0.1em",
+                  color: st === "done" ? "#00ff9d" : "#1e3348",
+                }}>
+                  {lbl}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
+
+      {/* ══ CONTENT ═════════════════════════════════════════ */}
+      <div style={s.body}>
+        {activeTab === "analyse"  && (
+          <StatsPanel
+            stats={stats}
+            activeAlgo={currentAlgo}
+            allResults={allResults}
+            liveClustering={liveClustering}
+            vehicles={vehicles}
+            selectedCluster={selectedCluster}
+            onSelectCluster={onSelectCluster}
+          />
+        )}
+        {activeTab === "pipeline" && (
+          <AnalysisPipelinePanel
+            pipelineStatus={pipelineStatus}
+            activeAlgo={currentAlgo}
+          />
+        )}
+        {activeTab === "graphe" && (
+          <GraphePanel
+            activeAlgo={currentAlgo}
+            allResults={allResults}
+          />
+        )}
+        {activeTab === "bilan" && (
+          <ComparisonPanel
+            allResults={allResults}
+            pipelineStatus={pipelineStatus}
+            liveClustering={liveClustering}
+          />
+        )}
+      </div>
     </div>
-  );
+  )
+}
+
+/* ─────────────────────────────────────────────────────
+   Styles inline — zéro conflit avec index.css existant
+───────────────────────────────────────────────────── */
+const s = {
+  page: {
+    display: "flex", flexDirection: "column",
+    height: "calc(100vh - 56px)",
+    background: "#030508",
+    fontFamily: "'DM Mono','Space Mono',monospace",
+    overflow: "hidden",
+  },
+
+  /* Header */
+  header: {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+    padding: "18px 28px 14px",
+    background: "#070c12", borderBottom: "1px solid #1a2535",
+    flexShrink: 0,
+  },
+  hLeft: { display: "flex", flexDirection: "column", gap: 10 },
+  titleRow: { display: "flex", alignItems: "center", gap: 14 },
+  titleIcon: { fontSize: 28, textShadow: "0 0 16px currentColor", lineHeight: 1 },
+  title: {
+    fontFamily: "Syne, 'DM Mono', monospace",
+    fontSize: 22, fontWeight: 800,
+    color: "#e8f4fd", letterSpacing: "0.02em", lineHeight: 1,
+  },
+  titleSub: {
+    fontSize: 9, letterSpacing: "0.2em",
+    color: "#1e3348", marginTop: 4, textTransform: "uppercase",
+  },
+  metaRow: { display: "flex", gap: 6, flexWrap: "wrap" },
+  chip: {
+    display: "flex", alignItems: "center", gap: 7,
+    background: "#0d1520", border: "1px solid #1a2535",
+    borderRadius: 4, padding: "4px 11px",
+  },
+  chipKey: {
+    fontSize: 9, letterSpacing: "0.18em",
+    color: "#1e3348", textTransform: "uppercase",
+  },
+  chipVal: { fontSize: 11, fontWeight: 700, letterSpacing: "0.07em" },
+  backBtn: {
+    padding: "8px 16px",
+    background: "transparent", border: "1px solid #1e3048",
+    borderRadius: 5, color: "#00e5ff",
+    fontSize: 10, letterSpacing: "0.18em",
+    cursor: "pointer", fontFamily: "inherit",
+    transition: "background .2s, border-color .2s",
+    flexShrink: 0, marginTop: 4,
+  },
+
+  /* Navbar */
+  navBar: {
+    display: "flex", alignItems: "stretch",
+    background: "#070c12", borderBottom: "1px solid #1a2535",
+    flexShrink: 0, padding: "0 16px",
+    overflowX: "auto",
+    gap: 0,
+  },
+  algoPills: {
+    display: "flex", alignItems: "center", gap: 2, padding: "6px 0",
+  },
+  algoPill: {
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+    padding: "5px 10px", border: "1px solid transparent",
+    borderRadius: 5, background: "transparent",
+    cursor: "pointer", fontFamily: "inherit",
+    fontSize: 9, letterSpacing: "0.12em",
+    transition: "all .18s", minWidth: 40,
+  },
+  navSep: { width: 1, background: "#1a2535", margin: "8px 10px", flexShrink: 0 },
+  tabs: { display: "flex", alignItems: "stretch", flex: 1 },
+  tab: {
+    padding: "0 20px", fontSize: 10, letterSpacing: "0.18em",
+    fontFamily: "inherit", cursor: "pointer",
+    border: "none", borderBottom: "2px solid transparent",
+    transition: "all .18s",
+    display: "flex", alignItems: "center", whiteSpace: "nowrap",
+  },
+
+  /* Pipeline dots */
+  pipeRow: {
+    display: "flex", alignItems: "center", gap: 2,
+    marginLeft: "auto", padding: "0 4px", flexShrink: 0,
+  },
+  pipeDotWrap: {
+    display: "flex", flexDirection: "column", alignItems: "center",
+    gap: 3, padding: "6px 5px", cursor: "default",
+  },
+  pipeDot: {
+    width: 7, height: 7, borderRadius: "50%",
+    transition: "background .3s, box-shadow .3s",
+  },
+
+  /* Body */
+  body: {
+    flex: 1, overflowY: "auto", padding: "20px 24px",
+    scrollbarWidth: "thin", scrollbarColor: "#1a2535 transparent",
+  },
 }

@@ -1,77 +1,130 @@
 import React from "react"
+import { Button } from "./ui"
 
 export default function Header({
-  simState, loading, startConfig, setStartConfig,
-  showSplit, onToggleSplit, onStart, onPause, onStop,
-  activeAlgo, viewMode, onToggleView
+  simState,
+  fps,
+  loading,
+  startConfig,
+  setStartConfig,
+  showSplit,
+  onToggleSplit,
+  onStart,
+  onPause,
+  onStop,
+  activeAlgo,
+  viewMode,
+  onToggleView,
+  onGoAnalysis,
+  step,
+  nVehicles,
 }) {
-  const running = simState.running
+  const running = simState?.running ?? false
+  const statusLabel = running
+    ? simState.paused
+      ? "PAUSE"
+      : "EN COURS"
+    : "IDLE"
 
   return (
     <header className="header-v2">
-      {/* ── Brand ── */}
       <div className="brand-section">
         <div className="logo-box">⬡</div>
         <div className="brand-text">
           <div className="brand-main">
-            <span className="sumo">SUMO</span><span className="casa">Casa</span>
+            <span className="sumo">SUMO</span>
+            <span className="casa">Casa</span>
           </div>
           <div className="brand-sub">TRAFFIC SIMULATION · CASABLANCA</div>
         </div>
       </div>
 
-      {/* ── Active algo chip ── */}
       <div className="center-display">
         <div
           className="active-algo-chip"
           style={{
             background: `${activeAlgo.color}0e`,
-            border: `1px solid ${activeAlgo.color}35`
+            border: `1px solid ${activeAlgo.color}35`,
           }}
         >
-          <span className="algo-icon" style={{ color: activeAlgo.color }}>{activeAlgo.icon}</span>
+          <span className="algo-icon" style={{ color: activeAlgo.color }}>
+            {activeAlgo.icon}
+          </span>
           <div className="algo-info">
-            <div className="algo-name" style={{ color: activeAlgo.color }}>{activeAlgo.label}</div>
+            <div className="algo-name" style={{ color: activeAlgo.color }}>
+              {activeAlgo.label}
+            </div>
             <div className="algo-ref">{activeAlgo.ref}</div>
           </div>
           <div className="chip-divider" style={{ background: `${activeAlgo.color}30` }} />
           <div className="live-counters">
-            <div className="lc-row">PAS&nbsp;<span className="lc-val">{simState.step}</span></div>
-            <div className="lc-row">VEH&nbsp;<span className="lc-val">{simState.vehicles?.length ?? 0}</span></div>
+            <div className="lc-row">
+              PAS&nbsp;<span className="lc-val">{simState.step}</span>
+            </div>
+            <div className="lc-row">
+              VEH&nbsp;<span className="lc-val">{simState.vehicles?.length ?? 0}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Controls ── */}
       <div className="controls-section">
-
-        {/* SPLIT toggle */}
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           className={`control-btn ${showSplit ? "active" : ""}`}
           onClick={onToggleSplit}
           title="Afficher / masquer la carte brute"
         >
           ⊞ SPLIT
-        </button>
+        </Button>
 
-        {/* VIEW MODE toggle — bouton principal */}
-        <button
-          className={`control-btn view-mode-btn ${viewMode === "panel" ? "vm-panel" : "vm-maps"}`}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`view-mode-btn ${viewMode === "panel" ? "vm-panel" : "vm-maps"}`}
           onClick={onToggleView}
-          title={viewMode === "maps" ? "Afficher le panneau d'analyse" : "Agrandir les cartes"}
-        >
-          {viewMode === "maps"
-            ? <><span className="vm-icon">⬛</span> MAPS</>
-            : <><span className="vm-icon">⊟</span> PANEL</>
+          title={
+            viewMode === "maps"
+              ? "Afficher le panneau d'analyse"
+              : "Agrandir les cartes"
           }
-        </button>
+        >
+          {viewMode === "maps" ? (
+            <>
+              <span className="vm-icon">⬛</span> MAPS
+            </>
+          ) : (
+            <>
+              <span className="vm-icon">⊟</span> PANEL
+            </>
+          )}
+        </Button>
 
         <div className="traci-badge">TraCI</div>
 
+        {typeof fps === "number" && (
+          <span className="fps-lbl" title="Pas/s (simulation)">
+            {fps.toFixed(1)} fps
+          </span>
+        )}
+
         <div className={`status-badge ${running ? "online" : "offline"}`}>
           <div className="dot" />
-          <span>{running ? (simState.paused ? "PAUSE" : "EN COURS") : "IDLE"}</span>
+          <span>{statusLabel}</span>
         </div>
+
+        {onGoAnalysis && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="tbtn tbtn-analyse"
+            onClick={onGoAnalysis}
+            title="Ouvrir la page analyse complète"
+          >
+            ⊞ ANALYSE
+          </Button>
+        )}
 
         <div className="action-btns">
           {!running ? (
@@ -80,24 +133,34 @@ export default function Header({
                 type="number"
                 className="n-veh-input"
                 value={startConfig.nVehicles}
-                min={10} max={500}
-                onChange={e => setStartConfig({ ...startConfig, nVehicles: parseInt(e.target.value) || 50 })}
+                min={10}
+                max={500}
+                onChange={(e) =>
+                  setStartConfig({
+                    ...startConfig,
+                    nVehicles: parseInt(e.target.value, 10) || 50,
+                  })
+                }
               />
-              <button
-                className="btn-start"
+              <Button
+                variant="primary"
+                size="icon"
+                accentColor={activeAlgo.color}
                 onClick={onStart}
                 disabled={loading}
-                style={{ color: activeAlgo.color, borderColor: `${activeAlgo.color}55` }}
+                className="btn-start"
               >
                 {loading ? <span style={{ fontSize: 10 }}>…</span> : "▶"}
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button className="btn-pause" onClick={onPause}>
+              <Button variant="ghost" size="icon" className="btn-pause" onClick={onPause}>
                 {simState.paused ? "▶" : "⏸"}
-              </button>
-              <button className="btn-stop" onClick={onStop}>■</button>
+              </Button>
+              <Button variant="danger" size="icon" className="btn-stop" onClick={onStop}>
+                ■
+              </Button>
             </>
           )}
         </div>

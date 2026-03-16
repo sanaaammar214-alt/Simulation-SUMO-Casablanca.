@@ -52,8 +52,10 @@ export function useSimulation() {
   const trailRef = useRef({})
   const [trails, setTrails] = useState({})
   const pollRef  = useRef(null)
+  const fpsRef   = useRef({ step: 0, time: Date.now() })
 
   const [liveClustering, setLiveClustering] = useState(null)
+  const [fps, setFps] = useState(0)
 
   // ── fetchState ─────────────────────────────────────────────────────────────
   const fetchState = useCallback(async () => {
@@ -98,10 +100,25 @@ export function useSimulation() {
         setLiveClustering(clustRes.data)
       }
 
+      const newStep = data.step ?? 0
+      const now = Date.now()
+      const prev = fpsRef.current
+      if (data.running && !data.paused && prev.time > 0) {
+        const dt = (now - prev.time) / 1000
+        if (dt >= 0.2) {
+          const stepDelta = Math.max(0, newStep - prev.step)
+          const computed = Math.round((stepDelta / dt) * 10) / 10
+          setFps(Math.min(120, Math.max(0, computed)))
+        }
+      } else {
+        setFps(0)
+      }
+      fpsRef.current = { step: newStep, time: now }
+
       setSimState({
         running: !!data.running,
         paused:  !!data.paused,
-        step:    data.step ?? 0,
+        step:    newStep,
         vehicles,
         mode:    data.mode ?? "idle",
         run_id:  data.run_id ?? null,
@@ -134,7 +151,9 @@ export function useSimulation() {
     setLoading(true)
     setError(null)
     trailRef.current = {}
+    fpsRef.current = { step: 0, time: Date.now() }
     setTrails({})
+    setFps(0)
     setSimState({ ...EMPTY_SIM_STATE, running: true, mode: "starting" })
 
     try {
@@ -163,7 +182,9 @@ export function useSimulation() {
     try {
       const { data } = await api.stopSim()
       trailRef.current = {}
+      fpsRef.current = { step: 0, time: 0 }
       setTrails({})
+      setFps(0)
       setStats(null)
       setSimState({ ...EMPTY_SIM_STATE, run_id: data?.run_id ?? null })
       if (data?.run_id) setCurrentRunId(data.run_id)
@@ -183,6 +204,7 @@ export function useSimulation() {
     vehicles: simState.vehicles || [],
     step:     simState.step     || 0,
     mode:     simState.mode     || "idle",
+    fps,
     startSim,
     pauseSim,
     stopSim,

@@ -30,60 +30,73 @@ export default function MongoSummaryBar({ currentRunId, pipelineStatus }) {
     return () => clearInterval(t)
   }, [fetchMongo])
 
+  // get step status from pipelineStatus prop (already polled by useAnalysis)
   const getStepStatus = (step) => {
+    // map frontend key to backend key
     const key = step === "stdbscan" ? "st_dbscan" : step
     return pipelineStatus?.analysis_steps?.[key]?.status || "pending"
   }
 
   return (
-    <div className="mongo-bar-v2">
-      <span className="mongo-badge-v2">MONGODB</span>
-      
-      <div className="run-indicator">
-        <div className="run-dot" style={{ background: currentRunId ? "var(--cyan)" : "var(--text-dim)" }} />
-        <span style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em" }}>RUN ACTUEL</span>
-        <span className="run-dash">—</span>
-        <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
-          {currentRunId ? currentRunId.replace("run_", "").replace(/_/g, " ").toUpperCase() : "AUCUN"}
-        </span>
+    <div className="mongo-summary-bar">
+      <div className="mongo-label">
+        {loading && <div className="mongo-spinner" />}
+        MONGODB
       </div>
 
-      <div className="bb-sep-v2" />
-      
-      <div className="stat-group">
-        <span>TOTAL RUNS</span>
-        <span className="stat-group-val">{mongoData?.total ?? "0"}</span>
-      </div>
+      <div className="mongo-scroll">
+        {/* Run actuel */}
+        <div className="mchip">
+          <span className="mchip-ico">🔵</span>
+          <div className="mchip-body">
+            <span className="mchip-lbl">RUN ACTUEL</span>
+            <span className="mchip-val" style={{ fontSize: 11 }}>
+              {currentRunId
+                ? `#${String(currentRunId).replace(/^run_/, "").slice(-6)}`
+                : "—"}
+            </span>
+          </div>
+        </div>
 
-      <div className="bb-sep-v2" />
-      
-      <span style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em" }}>PIPELINE</span>
-      <span className="pipeline-status-v2" style={{ 
-        color: pipelineStatus?.analysis_status === 'done' ? 'var(--green)' : pipelineStatus?.analysis_status === 'running' ? 'var(--amber)' : 'var(--text-muted)',
-        background: pipelineStatus?.analysis_status === 'done' ? 'rgba(0,255,157,0.1)' : pipelineStatus?.analysis_status === 'running' ? 'rgba(255,179,0,0.1)' : 'rgba(26,37,53,0.5)',
-        borderColor: pipelineStatus?.analysis_status === 'done' ? 'rgba(0,255,157,0.25)' : pipelineStatus?.analysis_status === 'running' ? 'rgba(255,179,0,0.25)' : 'var(--border)'
-      }}>
-        {(pipelineStatus?.analysis_status || "IDLE").toUpperCase()}
-      </span>
+        <div className="mongo-sep" />
 
-      <div className="bb-sep-v2" />
+        {/* Total runs */}
+        <div className="mchip">
+          <span className="mchip-ico">📊</span>
+          <div className="mchip-body">
+            <span className="mchip-lbl">TOTAL RUNS</span>
+            <span className="mchip-val">{mongoData?.total ?? "—"}</span>
+          </div>
+        </div>
 
-      <div style={{ display: "flex", gap: 12 }}>
+        {/* Pipeline global status */}
+        <div className="mchip">
+          <span className="mchip-ico">⚙️</span>
+          <div className="mchip-body">
+            <span className="mchip-lbl">PIPELINE</span>
+            <span className="mchip-val" style={{
+              color: pipelineStatus?.analysis_status === "done" ? "var(--green)"
+                   : pipelineStatus?.analysis_status === "running" ? "var(--yellow)"
+                   : "var(--t3)"
+            }}>
+              {(pipelineStatus?.analysis_status || "IDLE").toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div className="mongo-sep" />
+
+        {/* Per-algo status chips */}
         {ALGO_STEPS.map(step => {
           const status = getStepStatus(step)
           return (
-            <div key={step} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em" }}>
-              <div className="pipeline-dot-v2" style={{ 
-                background: status === 'done' ? 'var(--green)' : status === 'running' ? 'var(--amber)' : status === 'failed' ? 'var(--red)' : 'var(--text-dim)',
-                boxShadow: status === 'running' ? '0 0 4px var(--amber)' : 'none'
-              }} />
+            <div key={step} className={`mchip-algo-status ${status}`}>
+              <div className="sdot" />
               {ALGO_LABELS[step]}
             </div>
           )
         })}
       </div>
-
-      <div className="mongo-right">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {new Date().toLocaleDateString()}</div>
     </div>
   )
 }

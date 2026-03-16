@@ -1,13 +1,21 @@
 import React, { useMemo } from "react"
-import { CLUSTER_PALETTES } from "../Constants"
+import { CLUSTER_PALETTES } from "../../constants"
 import ClusterPanels from "./ClusterPanels"
+import { SectionHeader } from "../ui"
+
+function formatMetricValue(value) {
+  if (value == null) return "0"
+  if (typeof value === "number" && Number.isFinite(value)) return value.toFixed(3)
+  return String(value)
+}
 
 function MetricChip({ label, value, color }) {
+  const display = formatMetricValue(value)
   return (
     <div className="metric-chip-v2">
       <div className="label">{label}</div>
       <div className="value-row">
-        <span className="val" style={{ color }}>{value ?? 0}</span>
+        <span className="val" style={{ color }}>{display}</span>
       </div>
     </div>
   )
@@ -106,12 +114,15 @@ export default function StatsPanel({
 
       {/* Col 3 — clusters */}
       <div className="sp-clusters-col">
-        <div className="sp-section-hdr">
-          <span className="label">CLUSTERS DÉTECTÉS</span>
-          <span className="big-count" style={{ color: activeAlgo.color }}>
-            {data.summary?.n_clusters ?? 0}
-          </span>
-        </div>
+        <SectionHeader
+          label="CLUSTERS DÉTECTÉS"
+          right={
+            <span className="big-count" style={{ color: activeAlgo.color }}>
+              {data.summary?.n_clusters ?? 0}
+            </span>
+          }
+          className="sp-section-hdr"
+        />
         <ClusterPanels
           algoId={algoId}
           clusters={data.clusters}

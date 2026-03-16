@@ -25,9 +25,6 @@ export default function TRACLUSLayer({ result, palette }) {
         const color = palette[i % palette.length];
         const points = rep.trajectory;
 
-        // Guard: skip representatives with no renderable points
-        if (!points || points.length < 2) return null;
-
         return (
           <React.Fragment key={i}>
             <Polyline 

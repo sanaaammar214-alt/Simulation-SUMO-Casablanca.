@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+*.egg-info/
+dist/
+.env
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# SUMO
+sumo/trips.trips.xml
+sumo/routes.rou.xml
+sumo/*.alt.xml
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
